@@ -40,10 +40,11 @@ log.info("Initialized log for vmManager...")
 vmManager = None
 vmServer = None
 
-class prlVMManager:
+class PrlVMManager:
     """ Helper class that will provide perform operations on Parallel VMs """
     
     def __init__(self):
+        # initialize the desktop sdk & login to the Parallels local service
         prlsdkapi.init_desktop_sdk()
         self.server = prlsdkapi.Server()
         try:
@@ -245,8 +246,38 @@ class prlVMManager:
             vm_net_adapters[n]["ip"] = ip
         
         return vm_net_adapters
+    
+    def startVM(self, vm):
+        # Check whether the vm is already running otherwise start it
+        status = self.getVMStatus(vm)
+        if (status != "running"):
+            try:
+                vm.start().wait()
+                status = 'started'
+            except:
+                status = "Error: %s" % e
+        
+        return status
+    
+    def stopVM(self, vm, acpi):
+        status = self.getVMStatus(vm)
+        if (status == "running"):
+            if (acpi):
+                try:
+                    vm.stop(True).wait()
+                    status = 'stopped'
+                except:
+                    status = "Error: %s" % e
+            else:
+                try:
+                    vm.stop().wait()
+                    status = 'stopped'
+                except:
+                    status = "Error: %s" % e
+        
+        return status
 
-class serverUtils:
+class ServerUtils:
     """ A general utility class providing helper methods """
     
     def screenshot(self):
@@ -270,7 +301,7 @@ class serverUtils:
 
         return image
 
-    def parseJSONfromPOST(self):
+    def parseJSONFromPOST(self):
         """
         This method will parse the JSON input from the POST body & return a
         python dict object
@@ -331,7 +362,7 @@ class serverUtils:
 ################################################################################
 
 vmServer = Bottle()
-vmManager = prlVMManager()
+vmManager = PrlVMManager()
 
 @vmServer.error(404)
 def error404(error):
@@ -547,6 +578,62 @@ def vmAdapterInfo(vmName):
         status = 9
     
     log.debug("Exiting vmAdapterInfo()...")
+    return {'status' : status, 'value' : value}
+
+@vmServer.get('/VM/:vmName/start')
+def vmStart(vmName):
+    """
+    Start the VM if it is not already running. This just refers to the VM &
+    not the OS running (or stopped) in it.
+
+    Resource : <b>/VM/:vmName/start</b>
+
+    @return <b><JSONResponseObject></b>
+    """
+    log.debug("Entered vmStart()...")
+    
+    vm = vmManager.searchVM(vmName)
+    value = None
+    status = None 
+    if (vm):
+        value = vmManager.startVM(vm)
+        status = 0
+    else:
+        value = 'Could not find the given VM name'
+        status = 9
+    
+    log.debug("Exiting vmStart()...")
+    return {'status' : status, 'value' : value}
+
+@vmServer.put('/VM/:vmName/stop')
+def vmStop(vmName):
+    """
+    Stop the VM if it is running. This can also stop the 
+
+    Resource : <b>/VM/:vmName/start</b>
+
+    @return <b><JSONResponseObject></b>
+    """
+    log.debug("Entered vmStart()...")
+    
+    b_acpi = False
+    utils = ServerUtils()
+    if (request.body.readline()):
+        data = utils.parseJSONFromPOST()
+        if data.has_key('acpi'):
+            b_acpi = data["acpi"]
+
+    vm = vmManager.searchVM(vmName)
+    value = None
+    status = None 
+    if (vm):
+        value = vmManager.stopVM(vm, b_acpi)
+        status = 0
+    else:
+        value = 'Could not find the given VM name'
+        status = 9
+    
+    log.debug("Exiting vmStart()...")
     return {'status' : status, 'value' : value}
 
 run(app=vmServer, host='0.0.0.0', port=9898, reloader=reload)
