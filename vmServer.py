@@ -681,7 +681,9 @@ def vmStop(vmName):
 
     Resource : <b>/VM/:vmName/start</b>
     POST Data: JSON object with key 'acpi' as true or false value.
-
+    
+    @code curl -d"{\"acpi\":true}" -X PUT http://localhost:9898/VM/Lion123/stop
+    
     @return <b><JSONResponseObject></b>
     """
     log.debug("Entered vmStart()...")
