@@ -1,0 +1,35 @@
+*** This is very early stage, things can change around a bit ***
+
+PARALLELS VM MANAGER
+
+This is a REST(ish) server to remotely manage Parallels VMs on an OS X box. This
+is designed to work with Parallels Desktop. It exposes a bunch of resources to
+perform basic operations on a VM like start, stop, read status of VM, revert to
+snapshot etc. This is currently a work in progress & more resources will be added.
+
+USAGE SCENARIO
+
+This will be ideal in scenarios where you have a bunch of Mac Minis & want to use
+them for automation. Install Parallels on each mini, install Parallels Virtualization
+SDK & install this server. Now you can manage these VMs remotely with this
+server. 
+
+NOTE:
+
+The Parallels Virtualization SDK listed on Parallels site is very old (as of this
+writing), you should download following instead:
+
+http://download.parallels.com/desktop/v7/ga-locales/ParallelsVirtualizationSDK-7.0.14922.693916.dmg
+
+FUTURE ENHANCEMENTS
+
+Future enhancements might include a master-slave setup where you have a
+controller & these managers automatically register with the controller through
+which you can control all the VMs.
+
+LICENSE
+
+This project uses Bottle to provide the HTTP server functionality & is included
+with the source & the license it was released with it applies to that part of the
+code. Anything else is released under FreeBSD license.
+
