@@ -519,6 +519,7 @@ def vmList():
         value = "Could not get list of VMs."
 
     log.debug("Exiting vmList()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status':status, 'value':value}
 
 @vmServer.get('/VM/listWithInfo')
@@ -544,6 +545,7 @@ def vmListWithInfo():
         value = "Could not get list of VMs."
 
     log.debug("Exiting vmList()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status':status, 'value':value}
 
 @vmServer.get('/VM/:vmName/info')
@@ -568,6 +570,7 @@ def vmInfo(vmName):
         status = 9
     
     log.debug("Exiting vmInfo()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
 @vmServer.get('/VM/:vmName/status')
@@ -592,6 +595,7 @@ def vmStatus(vmName):
         status = 9
     
     log.debug("Exiting vmStatus()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
 @vmServer.get('/VM/:vmName/os')
@@ -616,6 +620,7 @@ def vmOSInfo(vmName):
         status = 9
     
     log.debug("Exiting vmOSInfo()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
 @vmServer.get('/VM/:vmName/adapters')
@@ -640,6 +645,7 @@ def vmAdapterInfo(vmName):
         status = 9
     
     log.debug("Exiting vmAdapterInfo()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
 @vmServer.get('/VM/:vmName/start')
@@ -665,14 +671,16 @@ def vmStart(vmName):
         status = 9
     
     log.debug("Exiting vmStart()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
 @vmServer.put('/VM/:vmName/stop')
 def vmStop(vmName):
     """
-    Stop the VM if it is running. This can also stop the 
+    Stop the VM if it is running. This can also stop the OS.
 
     Resource : <b>/VM/:vmName/start</b>
+    POST Data: JSON object with key 'acpi' as true or false value.
 
     @return <b><JSONResponseObject></b>
     """
@@ -696,6 +704,7 @@ def vmStop(vmName):
         status = 9
     
     log.debug("Exiting vmStart()...")
+    response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
 run(app=vmServer, host='0.0.0.0', port=9898, reloader=reload)
