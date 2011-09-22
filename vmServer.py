@@ -41,7 +41,7 @@ vmManager = None
 vmServer = None
 
 class PrlVMManager:
-    """ Helper class that will provide perform operations on Parallel VMs """
+    """ Helper class that will perform operations on Parallels VMs """
     
     def __init__(self):
         # initialize the desktop sdk & login to the Parallels local service
@@ -59,10 +59,15 @@ class PrlVMManager:
         self.server.logoff()
         prlsdkapi.deinit_sdk()
             
-    # Obtain a Vm object for the virtual machine specified by its name.
-    # @param vm_to_find: Name of the virtual machine to find.
-    #                    Can be a partial name (starts with the specified string).
     def searchVM(self, vm_to_find):
+        """
+        This method will Obtain a Vm object for the virtual machine specified by
+        its name.
+        
+        @param vm_to_find: Name of the virtual machine to find. Can also be a
+                           partial name (starts with the specified string)
+        @return <b><Object></b>: Returns a vm object
+        """
         try:
             result = self.server.get_vm_list().wait()
         except prlsdkapi.PrlSDKError, e:
@@ -78,7 +83,7 @@ class PrlVMManager:
         return
     
     def _getVMObjects(self):
-        # Obtain the virtual machine list.
+        # This is an internal method, which obtains the virtual machine list.
         # getVMList is an asynchronous method that returns
         # a prlsdkapi.Result object containing the list of virtual machines.
         job = self.server.get_vm_list()
@@ -87,6 +92,12 @@ class PrlVMManager:
         return result
     
     def getVMList(self):
+        """
+        This method will find all the VMs that are available in Parallels &
+        return them as a list.
+        
+        @return <b><List></b>: List of VM names.
+        """
         result = self._getVMObjects()
         vm_list = []
         for i in range(result.get_params_count()):
@@ -97,6 +108,13 @@ class PrlVMManager:
         return vm_list
     
     def getVMListWithInfo(self):
+        """
+        This method is similar to getVMList but will also gather all the VMs
+        relevant information like status, adapter information etc & return them
+        as a dictionary. 
+        
+        @return <b><Dictionary></b>: List of VMs and their relevant information.
+        """
         result = self._getVMObjects()
         
         # Iterate through the Result object parameters.
@@ -109,6 +127,12 @@ class PrlVMManager:
         return vm_list_info
     
     def getVMInfo(self, vm):
+        """
+        Given a vm object, it'll return all the information about that VM.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @return <b><Dictionary></b>: VM's information as a dictionary.
+        """
         vm_info = {}
         vm_config = vm.get_config()
         vm_info["name"] = vm_config.get_name()
@@ -119,10 +143,13 @@ class PrlVMManager:
         return vm_info
     
     def getVMStatus(self, vm):
-        # Obtain the VmInfo object containing the
-        # virtual machine state info.
-        # The object is obtained from the Result object returned by
-        # the vm.get_state() method.
+        """
+        This method will determine the status of a VM.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @return <b><String></b>: Status string; either "running", "suspended",
+                                 "stopped" or "paused"
+        """
         try:
             state_result = vm.get_state().wait()
         except prlsdkapi.PrlSDKError, e:
@@ -151,6 +178,14 @@ class PrlVMManager:
         return state_desc
         
     def getVMOSInfo(self, vm):
+        """
+        This method will determine the OS that the VM is running. If it can't
+        determine the OS or its version, a generic prlsdkapi.prlsdk.consts
+        constant is returned.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @return <b><Dictionary></b>: Dictionary with OS type & OS version.
+        """
         vm_config = vm.get_config()
         # initialize our defaults
         osType = ""
@@ -191,8 +226,15 @@ class PrlVMManager:
         return {"osType" : osType, "osVersion" : osVersion}
     
     def getVMNetInfo(self, vm):
-        # Obtain the VmConfig object containing the virtual machine
-        # configuration information.
+        """
+        This method will find all the adapters of the Vm & list the MAC address,
+        IP (if running) & type of adapter. It uses ARP to determine the ip of
+        the adapter.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @return <b><Dictionary></b>: Dictionary with "type" of adapter, its "mac"
+                                     address & assigned "ip" (only when OS is running)
+        """
         vm_config = vm.get_config()
         vm_net_adapters = {}
     
@@ -248,6 +290,13 @@ class PrlVMManager:
         return vm_net_adapters
     
     def startVM(self, vm):
+        """
+        Starts a VM if it is not in "running" state.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @return <b><String></b>: "started" if successfully started, otherwise
+                                 status as returned by getVMStatus().
+        """
         # Check whether the vm is already running otherwise start it
         status = self.getVMStatus(vm)
         if (status != "running"):
@@ -260,6 +309,15 @@ class PrlVMManager:
         return status
     
     def stopVM(self, vm, acpi):
+        """
+        Stops a VM if it is in "running" state.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @param <b><Boolean></b>: Whether to perform a graceful shutdown of VM's
+                                 OS using ACPI (if the OS supports it).
+        @return <b><String></b>: "stopped" if successfully stopped, otherwise
+                                 status as returned by getVMStatus().
+        """
         status = self.getVMStatus(vm)
         if (status == "running"):
             if (acpi):
@@ -359,11 +417,15 @@ class ServerUtils:
             log.error(e)
 
         return details
+
 ################################################################################
 
 vmServer = Bottle()
 vmManager = PrlVMManager()
 
+################################################################################
+# Routes
+################################################################################
 @vmServer.error(404)
 def error404(error):
     return 'Ooh, over there. Something shiny!'
