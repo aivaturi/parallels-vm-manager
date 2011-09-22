@@ -30,7 +30,7 @@ if (len(sys.argv) > 1):
 # Logging settings for Rome Server
 log = logging.getLogger('vmManager')
 log.setLevel(logging.DEBUG)
-log_file = './vmManager.log'
+log_file = './prlManager.log'
 fileHandler = logging.FileHandler(log_file)
 format = logging.Formatter("%(asctime)s %(levelname)s %(filename)s: %(funcName)s() %(lineno)d %(message)s")
 fileHandler.setFormatter(format)
@@ -68,10 +68,12 @@ class PrlVMManager:
                            partial name (starts with the specified string)
         @return <b><Object></b>: Returns a vm object
         """
+        log.debug("Entering searchVM()...")
         try:
             result = self.server.get_vm_list().wait()
         except prlsdkapi.PrlSDKError, e:
-            print "Error: %s" % e
+            log.error("Error: %s" % e)
+            log.debug("Exiting searchVM()...")
             return
     
         for i in range(result.get_params_count()):
@@ -79,16 +81,19 @@ class PrlVMManager:
             vm_name = vm.get_name()
             if vm_name.startswith(vm_to_find):
                 return vm
-    
+        
+        log.debug("Exiting searchVM()...")
         return
     
     def _getVMObjects(self):
         # This is an internal method, which obtains the virtual machine list.
         # getVMList is an asynchronous method that returns
         # a prlsdkapi.Result object containing the list of virtual machines.
+        log.debug("Entering _getVMObjects()...")
         job = self.server.get_vm_list()
         result = job.wait()
         
+        log.debug("Exiting _getVMObjects()...")
         return result
     
     def getVMList(self):
@@ -98,6 +103,7 @@ class PrlVMManager:
         
         @return <b><List></b>: List of VM names.
         """
+        log.debug("Entering getVMList()...")
         result = self._getVMObjects()
         vm_list = []
         for i in range(result.get_params_count()):
@@ -105,6 +111,8 @@ class PrlVMManager:
             vm_config = vm.get_config()
             vm_list.append(vm_config.get_name())
         
+        log.debug(vm_list)
+        log.debug("Exiting getVMList()...")
         return vm_list
     
     def getVMListWithInfo(self):
@@ -115,6 +123,7 @@ class PrlVMManager:
         
         @return <b><Dictionary></b>: List of VMs and their relevant information.
         """
+        log.debug("Entering getVMListWithInfo()...")
         result = self._getVMObjects()
         
         # Iterate through the Result object parameters.
@@ -124,6 +133,8 @@ class PrlVMManager:
             vm = result.get_param_by_index(i)
             vm_list_info[i] = self.getVMInfo(vm)
         
+        log.debug(vm_list_info)
+        log.debug("Exiting getVMListWithInfo()...")
         return vm_list_info
     
     def getVMInfo(self, vm):
@@ -133,6 +144,7 @@ class PrlVMManager:
         @param <b><Object></b>: prlsdapi vm object
         @return <b><Dictionary></b>: VM's information as a dictionary.
         """
+        log.debug("Entering getVMInfo()...")
         vm_info = {}
         vm_config = vm.get_config()
         vm_info["name"] = vm_config.get_name()
@@ -140,6 +152,7 @@ class PrlVMManager:
         vm_info["os"] = self.getVMOSInfo(vm)
         vm_info["network"] = self.getVMNetInfo(vm)
         
+        log.debug("Exiting getVMInfo()...")
         return vm_info
     
     def getVMStatus(self, vm):
@@ -150,10 +163,12 @@ class PrlVMManager:
         @return <b><String></b>: Status string; either "running", "suspended",
                                  "stopped" or "paused"
         """
+        log.debug("Entering getVMStatus()...")
         try:
             state_result = vm.get_state().wait()
         except prlsdkapi.PrlSDKError, e:
-            print "Error: %s" % e
+            log.erro("Error: %s" % e)
+            log.debug("Exiting getVMStatus()...")
             return
 
         # Now obtain the VmInfo object.
@@ -175,6 +190,7 @@ class PrlVMManager:
         elif state_code == prlsdkapi.prlsdk.consts.VMS_SUSPENDED:
             state_desc = "suspended"
         
+        log.debug("Exiting getVMStatus()...")
         return state_desc
         
     def getVMOSInfo(self, vm):
@@ -186,6 +202,7 @@ class PrlVMManager:
         @param <b><Object></b>: prlsdapi vm object
         @return <b><Dictionary></b>: Dictionary with OS type & OS version.
         """
+        log.debug("Entering getVMOSInfo()...")
         vm_config = vm.get_config()
         # initialize our defaults
         osType = ""
@@ -223,6 +240,7 @@ class PrlVMManager:
         else:
             osVersion = "Other version (" + str(os_version) + ")"
         
+        log.debug("Exiting getVMOSInfo()...")
         return {"osType" : osType, "osVersion" : osVersion}
     
     def getVMNetInfo(self, vm):
@@ -235,6 +253,7 @@ class PrlVMManager:
         @return <b><Dictionary></b>: Dictionary with "type" of adapter, its "mac"
                                      address & assigned "ip" (only when OS is running)
         """
+        log.debug("Entering getVMNetInfo()...")
         vm_config = vm.get_config()
         vm_net_adapters = {}
     
@@ -286,7 +305,8 @@ class PrlVMManager:
                 ip = m.group(1)
             
             vm_net_adapters[n]["ip"] = ip
-        
+            
+        log.debug("Exiting getVMNetInfo()...")
         return vm_net_adapters
     
     def startVM(self, vm):
@@ -297,6 +317,7 @@ class PrlVMManager:
         @return <b><String></b>: "started" if successfully started, otherwise
                                  status as returned by getVMStatus().
         """
+        log.debug("Entering startVM()...")
         # Check whether the vm is already running otherwise start it
         status = self.getVMStatus(vm)
         if (status != "running"):
@@ -306,6 +327,7 @@ class PrlVMManager:
             except:
                 status = "Error: %s" % e
         
+        log.debug("Exiting startVM()...")
         return status
     
     def stopVM(self, vm, acpi):
@@ -318,6 +340,7 @@ class PrlVMManager:
         @return <b><String></b>: "stopped" if successfully stopped, otherwise
                                  status as returned by getVMStatus().
         """
+        log.debug("Entering stopVM()...")
         status = self.getVMStatus(vm)
         if (status == "running"):
             if (acpi):
@@ -332,7 +355,8 @@ class PrlVMManager:
                     status = 'stopped'
                 except:
                     status = "Error: %s" % e
-        
+                    
+        log.debug("Exiting stopVM()...")
         return status
 
 class ServerUtils:
@@ -345,6 +369,7 @@ class ServerUtils:
 
         @return <b><Binary></b>: Returns a jpg, if one was generated
         """
+        log.debug("Entering screenshot()...")
         screen = '/tmp/screen.jpg'
         image = None
 
@@ -356,7 +381,8 @@ class ServerUtils:
             log.exception("Could not generate screen")
         finally:
             os.remove(screen)
-
+        
+        log.debug("Exiting screenshot()...")
         return image
 
     def parseJSONFromPOST(self):
@@ -388,6 +414,7 @@ class ServerUtils:
                         'osbit'  : 32 or 64 bit OS
                         'osver'  : version of the OS if available
         """
+        log.debug("Entering osDetails()...")
         details = {}
         cmd = 'sw_vers -productName'
         try:
@@ -415,7 +442,8 @@ class ServerUtils:
         except:
             e = sys.exc_info()[1]
             log.error(e)
-
+        
+        log.debug("Exiting osDetails()...")
         return details
 
 ################################################################################
