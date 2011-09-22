@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
+__author__  = 'Aditya Ivaturi'
+__version__ = '0.1'
+__license__ = 'FreeBSD'
+
 import base64
 import json
 import logging
