@@ -247,17 +247,40 @@ class PrlVMManager:
         log.debug("Exiting getVMOSInfo()...")
         return {"osType" : osType, "osVersion" : osVersion}
     
-    def getVMNetInfo(self, vm):
+    def getVMNetInfo(self, vm, g_username="", g_password=""):
+        """
+        This method will find all the adapters of the Vm & get its relevant
+        information. This will first try to log in to the guest & find that info
+        from within the guest, if it can't do that then it'll try to determine
+        that information from outside the VM. You will get much better & detailed
+        info if you provide username & password of the guest VM.
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @param <b><String></b>: <optional> guest OS username
+        @param <b><String></b>: <optional> guest OS password
+        @return <b><Dictionary></b>: Dictionary with adapter details
+        """
+        
+        # First try getting the information from inside & if that returns empty
+        # try getting the information from outside
+        vm_net_adapters = self._getVMNetInfoFromInsideVM(vm, g_username, g_password)
+        if (not vm_net_adapters):
+            vm_net_adapters = self._getVMNetInfoFromOutsideVM(vm)
+        return vm_net_adapters
+    
+    def _getVMNetInfoFromOutsideVM(self, vm):
         """
         This method will find all the adapters of the Vm & list the MAC address,
         IP (if running) & type of adapter. It uses ARP to determine the ip of
-        the adapter.
+        the adapter. All this information is gathered from outside the VM.
+        
+        @note Also look at _getVMNetInfoFromInsideVM().
         
         @param <b><Object></b>: prlsdapi vm object
         @return <b><Dictionary></b>: Dictionary with "type" of adapter, its "mac"
                                      address & assigned "ip" (only when OS is running)
         """
-        log.debug("Entering getVMNetInfo()...")
+        log.debug("Entering getVMNetInfoFromOutsideVM()...")
         vm_config = vm.get_config()
         vm_net_adapters = {}
     
@@ -310,7 +333,63 @@ class PrlVMManager:
             
             vm_net_adapters[n]["ip"] = ip
             
-        log.debug("Exiting getVMNetInfo()...")
+        log.debug("Exiting getVMNetInfoFromOutsideVM()...")
+        return vm_net_adapters
+    
+    def _getVMNetInfoFromInsideVM(self, vm, g_username, g_password):
+        """
+        This method will try to log in & create a new session in the VM or bind
+        to an existing one and will find all the adapters of the Vm & list the
+        MAC address, IP/Subnet, type of adapter, gateway & DNS.
+        
+        @note Also look at _getVMNetInfoFromOutsideVM().
+        
+        @param <b><Object></b>: prlsdapi vm object
+        @param <b><String></b>: guest OS username
+        @param <b><String></b>: guest OS password
+        @return <b><Dictionary></b>: Dictionary with all the adapters info
+        """
+        
+        log.debug("Entering getVMNetInfoFromInsideVM()...")
+
+        vm_net_adapters = {}
+        # login to the guest & create a session
+        try:
+            vm_guest = vm.login_in_guest(g_username, g_password).wait().get_param()
+        except prlsdkapi.PrlSDKError, e:
+            log.error("Guest OS Login Error: %s" % e)
+            return
+        server_config = vm_guest.get_network_settings().wait().get_param()
+        count  = server_config.get_net_adapters_count()
+        vm_net_adapters = {}
+        
+        # Find all the adapters & collect their information
+        for n in range(count):
+            vm_net_adapters[n] = {}
+            type = ""
+    
+            host_net = server_config.get_net_adapter(n)        
+            emulated_type = host_net.get_net_adapter_type()
+            if emulated_type == prlsdkapi.prlsdk.consts.PNA_HOST_ONLY:
+                type = "host-only"
+            elif emulated_type == prlsdkapi.prlsdk.consts.PNA_SHARED:
+                type = "shared"
+            elif emulated_type == prlsdkapi.prlsdk.consts.PNA_BRIDGED_ETHERNET:
+                type = "bridged"
+            vm_net_adapters[n]["type"] = type
+            vm_net_adapters[n]["ip"] = host_net.get_net_addresses().get_item(0)
+            vm_net_adapters[n]["mac"] = host_net.get_mac_address()
+            dns_str_list = host_net.get_dns_servers()
+            dns_str_cnt = dns_str_list.get_items_count()
+            dns_str = []
+            for m in range(dns_str_cnt):
+                dns_str.append(dns_str_list.get_item(m))
+            vm_net_adapters[n]["dns"] = dns_str
+            vm_net_adapters[n]["gateway"] = host_net.get_default_gateway()
+        
+        # Logout from our session
+        vm_guest.logout()            
+        log.debug("Exiting getVMNetInfoFromInsideVM()...")
         return vm_net_adapters
     
     def startVM(self, vm):
@@ -656,6 +735,7 @@ def vmOSInfo(vmName):
     return {'status' : status, 'value' : value}
 
 @vmServer.get('/VM/:vmName/adapters')
+@vmServer.post('/VM/:vmName/adapters')
 def vmAdapterInfo(vmName):
     """
     Returns the adapter(s) details of the VM
@@ -666,11 +746,21 @@ def vmAdapterInfo(vmName):
     """
     log.debug("Entered vmAdapterInfo()...")
     
-    vm = vmManager.searchVM(vmName)
     value = None
-    status = None 
+    status = None
+    username = ""
+    password = ""
+    utils = ServerUtils()
+    if ((request.method == 'POST') and request.body.readline()):
+        data = utils.parseJSONFromPOST()
+        if data.has_key('username'):
+            username = data["username"]
+        if data.has_key('password'):
+            password = data['password']
+    
+    vm = vmManager.searchVM(vmName)
     if (vm):
-        value = vmManager.getVMNetInfo(vm)
+        value = vmManager.getVMNetInfo(vm, username, password)
         status = 0
     else:
         value = 'Could not find the given VM name'
