@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import subprocess
+import xml.etree.ElementTree
 
 from bottle import *
 import prlsdkapi
@@ -407,7 +408,7 @@ class PrlVMManager:
             try:
                 vm.start().wait()
                 status = 'started'
-            except:
+            except prlsdkapi.PrlSDKError, e:
                 status = "Error: %s" % e
         
         log.debug("Exiting startVM()...")
@@ -430,17 +431,59 @@ class PrlVMManager:
                 try:
                     vm.stop(True).wait()
                     status = 'stopped'
-                except:
+                except prlsdkapi.PrlSDKError, e:
                     status = "Error: %s" % e
             else:
                 try:
                     vm.stop().wait()
                     status = 'stopped'
-                except:
+                except prlsdkapi.PrlSDKError, e:
                     status = "Error: %s" % e
                     
         log.debug("Exiting stopVM()...")
         return status
+    
+    def switchToSnapshot(self, vm, snapshot_name):
+        """
+        Switches to an existing snapshot.
+        
+        @param <b><Object></b>: prlsdapi vm object.
+        @param <b><String></b>: Name of the snapshot to switch to.
+        @return <b><String></b>: Reason string explainign what happened.
+        """
+        log.debug("Entered switchToSnapshot()...")
+        xml_str = vm.get_snapshots_tree().wait().get_param_as_string()
+        log.debug(xml_str)
+        # ElementTree doesn't appreciate if you undeclare the prefix, so we
+        # gotta take care of it
+        xml_hack = 'xmlns:xsi="" vm_uuid="" xsi:noNamespaceSchemaLocation=""'
+        xml_str = re.sub(xml_hack, '', xml_str)
+        snaps_xml_obj = xml.etree.ElementTree.fromstring(xml_str)
+        snaps = snaps_xml_obj.findall(".//SavedStateItem")
+        guid = None
+        for i in range(len(snaps)):
+            if (snaps[i].find("./Name").text == 'Snapshot 1'):
+                guid = snaps[i].get('guid')
+                break
+        log.debug(guid)
+        result = ""
+        if (guid):
+            try:
+                job = vm.switch_to_snapshot(guid)
+                job.wait()
+                ret_code = job.get_ret_code()
+                if (not ret_code):
+                    result = "Switched to given snapshot"
+                else:
+                    log.error(ret_code)
+                    result = "Encountered an error while switching to snapshot"
+            except prlsdkapi.PrlSDKError, e:
+                log.error("Error: %s " % e)
+                result = "Caught an exception while switching to snapshot"
+        else:
+            result = "Snapshot not found"
+        
+        return result
 
 class ServerUtils:
     """ A general utility class providing helper methods """
@@ -770,7 +813,7 @@ def vmAdapterInfo(vmName):
     response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
-@vmServer.get('/VM/:vmName/start')
+@vmServer.put('/VM/:vmName/start')
 def vmStart(vmName):
     """
     Start the VM if it is not already running. This just refers to the VM &
@@ -828,6 +871,45 @@ def vmStop(vmName):
         status = 9
     
     log.debug("Exiting vmStart()...")
+    response.content_type = 'application/json; charset=utf-8'
+    return {'status' : status, 'value' : value}
+
+@vmServer.put('/VM/:vmName/switchToSnapshot')
+def vmSwitchToSnapshot(vmName):
+    """
+    Siwtch to a given snapshot.
+
+    Resource : <b>/VM/:vmName/start</b>
+    POST Data: JSON object with key 'snapshot' containing the name of a snapshot.
+    
+    @return <b><JSONResponseObject></b>
+    """
+    log.debug("Entered vmSwitchToSnapshot()...")
+    
+    snapshot_name = None
+    utils = ServerUtils()
+    if (request.body.readline()):
+        data = utils.parseJSONFromPOST()
+        if data.has_key('snapshot'):
+            snapshot_name = data["snapshot"]
+    
+    if (not snapshot_name):
+        abort(400, "Snopshot Name not provided, can't continue.")
+
+    vm = vmManager.searchVM(vmName)
+    value = None
+    status = None 
+    if (vm):
+        value = vmManager.switchToSnapshot(vm, snapshot_name)
+        if (value == "Switched to given snapshot"):
+            status = 0
+        else:
+            status = 9
+    else:
+        value = 'Could not find the given VM name'
+        status = 9
+    
+    log.debug("Exiting vmSwitchToSnapshot()...")
     response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
