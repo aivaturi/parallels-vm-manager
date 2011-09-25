@@ -643,6 +643,7 @@ def routes():
     Returns list of routes available
 
     Resource : <b>/routes</b>
+    Method : GET
     """
     routes = ""
     for route in vmServer.routes:
@@ -656,6 +657,7 @@ def screenshot():
     base64 encoded image back.
 
     Resource : <b>/screenshot</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -683,6 +685,7 @@ def os():
     This method will return the OS details vmManager is running on
 
     Resource : <b>/os</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -709,6 +712,7 @@ def vmList():
     Returns list of VMs on the local machine (including templates).
 
     Resource : <b>/VM/list</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -735,6 +739,7 @@ def vmListWithInfo():
     Returns list of VMs on the local machine and their information
 
     Resource : <b>/VM/listAllWithInfo</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -761,6 +766,7 @@ def vmInfo(vmName):
     Returns information about the VM such as os, network, status etc
 
     Resource : <b>/VM/:vmName/info</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -786,6 +792,7 @@ def vmStatus(vmName):
     Returns status of the VM
 
     Resource : <b>/VM/:vmName/status</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -811,6 +818,7 @@ def vmOSInfo(vmName):
     Returns OS that VM is running
 
     Resource : <b>/VM/:vmName/os</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -837,6 +845,9 @@ def vmAdapterInfo(vmName):
     Returns the adapter(s) details of the VM
 
     Resource : <b>/VM/:vmName/adapters</b>
+    Method : GET, doesn't log in to VM
+    Method : POST, logs in to the VM using the provided credentials
+    POST Data: json object with keys - 'username' & 'password' to log in to guest.
 
     @return <b><JSONResponseObject></b>
     """
@@ -873,6 +884,7 @@ def vmStart(vmName):
     not the OS running (or stopped) in it.
 
     Resource : <b>/VM/:vmName/start</b>
+    Method : GET
 
     @return <b><JSONResponseObject></b>
     """
@@ -898,6 +910,7 @@ def vmStop(vmName):
     Stop the VM if it is running. This can also stop the OS.
 
     Resource : <b>/VM/:vmName/start</b>
+    Method : PUT
     POST Data: JSON object with key 'acpi' as true or false value.
     
     @code curl -d"{\"acpi\":true}" -X PUT http://localhost:9898/VM/Lion123/stop
@@ -933,6 +946,7 @@ def vmSwitchToSnapshot(vmName):
     Siwtch to a given snapshot.
 
     Resource : <b>/VM/:vmName/start</b>
+    Method : PUT
     POST Data: JSON object with key 'snapshot' containing the name of a snapshot.
     
     @return <b><JSONResponseObject></b>
@@ -972,6 +986,7 @@ def vmListTemplates():
     Returns a list of all the VMs that are templates.
     
     Resource : <b>/templates/list</b>
+    Method : GET
     
     @return <b><JSONResponseObject</b>
     """
@@ -997,6 +1012,7 @@ def vmDeployTemplate(templateName):
     Deploy a new virtual machine from an existing template
 
     Resource : <b>/templates/:templateName/deploy</b>
+    Method : POST
     POST Data: JSON object with key "new_name" providing a unique name for the new vm.
     
     @return <b><JSONResponseObject></b>
