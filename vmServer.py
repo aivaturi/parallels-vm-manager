@@ -113,12 +113,29 @@ class PrlVMManager:
         vm_list = []
         for i in range(result.get_params_count()):
             vm = result.get_param_by_index(i)
-            vm_config = vm.get_config()
-            vm_list.append(vm_config.get_name())
+            vm_list.append(vm.get_name())
         
         log.debug(vm_list)
         log.debug("Exiting getVMList()...")
         return vm_list
+    
+    def getTemplateList(self):
+        """
+        This method will find all the VMs that are templates & return them as a list.
+        
+        @return <b><List></b>: List of template names.
+        """
+        log.debug("Entering getTemplateList()...")
+        result = self._getVMObjects()
+        template_list = []
+        for i in range(result.get_params_count()):
+            vm = result.get_param_by_index(i)
+            if (vm.is_template()):
+                template_list.append(vm.get_name())
+        
+        log.debug(template_list)
+        log.debug("Exiting getTemplateList()...")
+        return template_list
     
     def getVMListWithInfo(self):
         """
@@ -483,7 +500,43 @@ class PrlVMManager:
         else:
             result = "Snapshot not found"
         
+        log.debug("Exiting switchToSnapshot()...")
         return result
+    
+    def deployTemplate(self, template, new_name):
+        """
+        Clones from a VM template & starts it.
+        
+        @param <b><Object></b>: prlsdapi vm object which is a template.
+        @param <b><String></b>: Name of the new VM that'll be deployed.
+        @return <b><String></b>: Reason string explaining what happened.
+        """
+        log.debug("Entered deployTemplate()...")
+        ret = ""
+        
+        # First check that new_name is unique
+        vm_list = self.getVMList()
+        if (new_name not in vm_list):
+            # verify that template is indeed a template...
+            if (template.is_template()):
+                try:
+                    log.debug("Clonning is in progress...")
+                    template.clone(new_name, "", False).wait()
+                    new_vm = self.searchVM(new_name)
+                    status = self.startVM(new_vm)
+                    if (status == 'started' or status == 'running'):
+                        ret = "deployed"
+                        log.debug("Deployed a new VM from template.")
+                except prlsdkapi.PrlSDKError, e:
+                    ret = "Error: %s" % e
+                    log.error(ret)
+            else:
+                ret = "Could not find a template with the given name"
+        else:
+            return "Another VM with the same name exists, provide a unique name for the new VM."
+        
+        log.debug("Exiting deployTemplate()...")        
+        return ret
 
 class ServerUtils:
     """ A general utility class providing helper methods """
@@ -653,7 +706,7 @@ def os():
 @vmServer.get('/VM/list')
 def vmList():
     """
-    Returns list of VMs on the local machine.
+    Returns list of VMs on the local machine (including templates).
 
     Resource : <b>/VM/list</b>
 
@@ -913,4 +966,68 @@ def vmSwitchToSnapshot(vmName):
     response.content_type = 'application/json; charset=utf-8'
     return {'status' : status, 'value' : value}
 
+@vmServer.get('/templates/list')
+def vmListTemplates():
+    """
+    Returns a list of all the VMs that are templates.
+    
+    Resource : <b>/templates/list</b>
+    
+    @return <b><JSONResponseObject</b>
+    """
+    log.debug("Entering vmListTemplates()...")
+    value = None
+    status = None
+    list = vmManager.getTemplateList()
+    log.debug(list)
+    if (list):
+        value = list
+        status = 0
+    else:
+        status = 9
+        value = "Could not get list of VMs."
+
+    log.debug("Exiting vmListTemplates()...")
+    response.content_type = 'application/json; charset=utf-8'
+    return {'status':status, 'value':value}
+
+@vmServer.post('/templates/:templateName/deploy')
+def vmDeployTemplate(templateName):
+    """
+    Deploy a new virtual machine from an existing template
+
+    Resource : <b>/templates/:templateName/deploy</b>
+    POST Data: JSON object with key "new_name" providing a unique name for the new vm.
+    
+    @return <b><JSONResponseObject></b>
+    """
+    log.debug("Entered vmDeployTemplate()...")
+    
+    new_name = None
+    utils = ServerUtils()
+    if (request.body.readline()):
+        data = utils.parseJSONFromPOST()
+        if data.has_key('new_name'):
+            new_name = data['new_name']
+    
+    if (not new_name):
+        abort(400, "Snopshot Name not provided, can't continue.")
+
+    template = vmManager.searchVM(templateName)
+    value = None
+    status = None 
+    if (template.is_template()):
+        value = vmManager.deployTemplate(template, new_name)
+        if (value == "deployed"):
+            status = 0
+        else:
+            status = 9
+    else:
+        value = 'Could not find the given template'
+        status = 9
+    
+    log.debug("Exiting vmDeployTemplate()...")
+    response.content_type = 'application/json; charset=utf-8'
+    return {'status' : status, 'value' : value}
+    
 run(app=vmServer, host='0.0.0.0', port=9898, reloader=reload)
